@@ -1,6 +1,7 @@
 import express from 'express';
 import Contact from '../models/contact.model.js';
 import Invitation from '../models/invitation.model.js';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -16,10 +17,16 @@ router.get('/', async (req, res) => {
         const invitationMap = new Map(invitations.map(inv => [inv.email, inv.invitationSent]));
         
         // Combine contact data with invitation status
-        const contactsWithInvitation = contacts.map(contact => ({
-            ...contact.toObject(),
-            invitationSent: invitationMap.get(contact.email) || false
-        }));
+        const contactsWithInvitation = contacts.map(contact => {
+            // If originalEmail exists, use that for display instead of potentially modified email
+            const displayEmail = contact.originalEmail || contact.email;
+            
+            return {
+                ...contact.toObject(),
+                displayEmail,
+                invitationSent: invitationMap.get(displayEmail) || invitationMap.get(contact.email) || false
+            };
+        });
 
         res.status(200).json({
             success: true,
@@ -39,21 +46,34 @@ router.get('/', async (req, res) => {
 // @access  Public
 router.post('/', async (req, res) => {
     try {
-        const { vorname, nachname, email, praxis } = req.body;
+        const { vorname, nachname, email, praxis, originalEmail } = req.body;
 
-        // Create new contact
-        const contact = await Contact.create({
+        // Create contact with all received fields
+        const contact = new Contact({
             vorname,
             nachname,
             email,
-            praxis
+            praxis,
+            // Store original email if provided
+            ...(originalEmail && { originalEmail })
         });
 
-        // Create invitation record with default false
-        await Invitation.create({
-            email,
-            invitationSent: false
-        });
+        await contact.save();
+
+        // Use the original email for invitation if available
+        const invitationEmail = originalEmail || email;
+        
+        try {
+            // Check if invitation already exists - use try/catch instead of query to handle race conditions
+            let invitation = new Invitation({
+                email: invitationEmail,
+                invitationSent: false
+            });
+            await invitation.save();
+        } catch (invErr) {
+            // If it fails because invitation already exists, that's okay
+            console.log('Note: Invitation may already exist for:', invitationEmail);
+        }
 
         res.status(201).json({
             success: true,
@@ -61,10 +81,12 @@ router.post('/', async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error('Error saving contact:', error);
+        
+        // Send a more generic error to simplify troubleshooting
         res.status(500).json({
             success: false,
-            message: 'Server Error'
+            message: 'Could not save contact. Please try again.'
         });
     }
 });

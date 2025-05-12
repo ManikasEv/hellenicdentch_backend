@@ -12,10 +12,20 @@ const contactSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
+        unique: false,
     },
     praxis: {
         type: String,
         required: true,
+    },
+    // Add fields to support duplicate email registrations
+    originalEmail: {
+        type: String,
+        required: false,
+    },
+    uniqueId: {
+        type: String,
+        required: false,
     }
 }, {
     timestamps: true
