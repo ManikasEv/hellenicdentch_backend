@@ -13,5 +13,8 @@ const invitationSchema = new mongoose.Schema({
     timestamps: true
 });
 
+// Define a non-unique index on email field
+invitationSchema.index({ email: 1 }, { unique: false });
+
 const Invitation = mongoose.model('Invitation', invitationSchema);
 export default Invitation; 
