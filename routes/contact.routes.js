@@ -41,12 +41,6 @@ router.post('/', async (req, res) => {
     try {
         const { vorname, nachname, email, praxis } = req.body;
 
-        // Check if contact with email already exists
-        const existingContact = await Contact.findOne({ email });
-        if (existingContact) {
-            return res.status(400).json({ message: 'Email already registered' });
-        }
-
         // Create new contact
         const contact = await Contact.create({
             vorname,
